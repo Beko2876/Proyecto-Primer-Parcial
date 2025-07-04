@@ -100,7 +100,7 @@ class Jugador(pygame.sprite.Sprite):
         self.velocidad = VELOCIDAD_GENERAL
         
         #utilizamos una imagen de un corazon para simular la vida del jugador
-        self.max_corazones = 5
+        self.max_corazones = 2
         self.corazones = self.max_corazones
         self.vida_por_corazon = 100
         self.vida_actual_corazon = self.vida_por_corazon
