@@ -224,3 +224,264 @@ def spawn_enemies_in_view(player_rect, current_enemies_count, current_turrets_co
             else: 
                 x_pos = random.randint(min(WORLD_WIDTH - TILE_SIZE, player_rect.centerx + ANCHO_PANTALLA // 2 + TILE_SIZE), min(WORLD_WIDTH - TILE_SIZE, player_rect.centerx + ANCHO_PANTALLA // 2 + spawn_margin))
                 y_pos = random.randint(max(0, player_rect.centery - ALTO_PANTALLA // 2), min(WORLD_HEIGHT - TILE_SIZE, player_rect.centery + ALTO_PANTALLA // 2))
+    seleccion_actual = 0
+    joystick = get_joystick()
+
+    num_personajes = len(personajes)
+    personaje_width = 150
+    personaje_height = 200
+    spacing = 50
+    total_width = num_personajes * personaje_width + (num_personajes - 1) * spacing
+    start_x = (ANCHO_PANTALLA - total_width) // 2
+    start_y = ALTO_PANTALLA // 2 - personaje_height // 2
+
+    while estado_actual == ESTADO_SELECCION_PERSONAJE:
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                global juego_corriendo
+                juego_corriendo = False
+                return
+            if evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_ESCAPE:
+                    estado_actual = ESTADO_MENU
+                    return
+                if evento.key == pygame.K_LEFT:
+                    seleccion_actual = (seleccion_actual - 1 + num_personajes) % num_personajes
+                if evento.key == pygame.K_RIGHT:
+                    seleccion_actual = (seleccion_actual + 1) % num_personajes
+                if evento.key == pygame.K_RETURN:
+                    personaje_elegido = personajes[seleccion_actual]
+                    #al iniciar el juego el jugador siempre aparecera en el centro del mapa
+                    jugador = Jugador(WORLD_WIDTH // 2, WORLD_HEIGHT // 2,
+                                     None,
+                                     personaje_elegido["imagen"],
+                                     usar_nuevo_sistema=True,
+                                     carpeta_movimiento=personaje_elegido["carpeta_movimiento"])
+                    estado_actual = ESTADO_JUEGO
+                    iniciar_juego()
+                    return
+            
+            if joystick:
+                if evento.type == pygame.JOYAXISMOTION:
+                    if evento.axis == 0:
+                        if evento.value < -joystick_threshold_menu and not joystick_moved_x:
+                            seleccion_actual = (seleccion_actual - 1 + num_personajes) % num_personajes
+                            joystick_moved_x = True
+                        elif evento.value > joystick_threshold_menu and not joystick_moved_x:
+                            seleccion_actual = (seleccion_actual + 1) % num_personajes
+                            joystick_moved_x = True
+                        elif abs(evento.value) < joystick_threshold_menu:
+                            joystick_moved_x = False
+                elif evento.type == pygame.JOYBUTTONDOWN:
+                    if evento.button == 0:
+                        personaje_elegido = personajes[seleccion_actual]
+                        jugador = Jugador(WORLD_WIDTH // 2, WORLD_HEIGHT // 2,
+                                         None,
+                                         personaje_elegido["imagen"],
+                                         usar_nuevo_sistema=True,
+                                         carpeta_movimiento=personaje_elegido["carpeta_movimiento"])
+                        estado_actual = ESTADO_JUEGO
+                        iniciar_juego()
+                        return
+                    elif evento.button == 1:
+                        estado_actual = ESTADO_MENU
+                        return
+
+        dibujar_fondo_estrellado()
+
+        fuente_titulo = pygame.font.Font(None, 60)
+        fuente_nombres = pygame.font.Font(None, 36)
+        fuente_instrucciones = pygame.font.Font(None, 28)
+
+        texto_titulo = fuente_titulo.render("SELECCIONA TU PERSONAJE", True, BLANCO)
+        PANTALLA.blit(texto_titulo, (ANCHO_PANTALLA // 2 - texto_titulo.get_width() // 2, 50))
+
+        for i, personaje in enumerate(personajes):
+            x_pos = start_x + i * (personaje_width + spacing)
+            y_pos = start_y
+
+            rect = pygame.Rect(x_pos, y_pos, personaje_width, personaje_height)
+            color_borde = ROJO if i == seleccion_actual else BLANCO
+            pygame.draw.rect(PANTALLA, color_borde, rect, 3)
+
+            if personaje["imagen"]:
+                img = pygame.transform.scale(personaje["imagen"], (personaje_width - 20, personaje_height - 60))
+                img_rect = img.get_rect(center=(rect.centerx, rect.centery - 15))
+                PANTALLA.blit(img, img_rect)
+            
+            texto_nombre = fuente_nombres.render(personaje["nombre"], True, color_borde)
+            texto_nombre_rect = texto_nombre.get_rect(center=(rect.centerx, rect.bottom - 25))
+            PANTALLA.blit(texto_nombre, texto_nombre_rect)
+
+        texto_instrucciones_nav = fuente_instrucciones.render("Usa ← y → para navegar, ENTER para seleccionar", True, BLANCO)
+        PANTALLA.blit(texto_instrucciones_nav,
+                     (ANCHO_PANTALLA // 2 - texto_instrucciones_nav.get_width() // 2, ALTO_PANTALLA - 80))
+        
+        texto_instrucciones_esc = fuente_instrucciones.render("Presiona ESC para volver al menú principal", True, BLANCO)
+        PANTALLA.blit(texto_instrucciones_esc,
+                     (ANCHO_PANTALLA // 2 - texto_instrucciones_esc.get_width() // 2, ALTO_PANTALLA - 40))
+
+        pygame.display.flip()
+        RELOJ.tick(FPS)
+
+def iniciar_juego():
+    global grupo_enemigos, grupo_torretas, grupo_obstaculos_actual, grid_mapa_actual, grupo_balas_enemigo, grupo_balas_jugador
+    global grupo_explosiones, grupo_powerups, grupo_indicadores_daño, grupo_indicadores_daño_jugador, camera_offset_x, camera_offset_y
+    global posicion_copa_mundo, copa_sprite, copa_encontrada, NIVEL_ACTUAL
+
+    grupo_balas_jugador.empty()
+    grupo_balas_enemigo.empty()
+    grupo_explosiones.empty()
+    grupo_indicadores_daño.empty()
+    grupo_indicadores_daño_jugador.empty()
+    copa_encontrada = False
+
+    #generamos el mapa al momento de iniciar la partida
+    generar_mapa_interactivo()
+
+    if jugador:
+        jugador.rect.center = (WORLD_WIDTH // 2, WORLD_HEIGHT // 2)
+    
+
+    camera_offset_x = jugador.rect.centerx - ANCHO_PANTALLA // 2
+    camera_offset_y = jugador.rect.centery - ALTO_PANTALLA // 2
+
+    camera_offset_x = max(0, min(WORLD_WIDTH - ANCHO_PANTALLA, camera_offset_x))
+    camera_offset_y = max(0, min(WORLD_HEIGHT - ALTO_PANTALLA, camera_offset_y))
+
+    #spaunean enemigos a la vista del jugador al momento de iniciar el juego
+    spawn_enemies_in_view(jugador.rect, len(grupo_enemigos), len(grupo_torretas))
+
+def escena_juego():
+    global estado_actual, juego_corriendo, sonido_mapa_actual, camera_offset_x, camera_offset_y
+    global grupo_explosiones, grupo_powerups, grupo_indicadores_daño, grupo_indicadores_daño_jugador, enemigos_eliminados_stats
+    global copa_encontrada, copa_sprite, NIVEL_ACTUAL
+
+    if jugador is None:
+        estado_actual = ESTADO_SELECCION_PERSONAJE
+        return
+
+    if ASSETS['sonido_mapa1'] and not pygame.mixer.Channel(0).get_busy():
+        pygame.mixer.Channel(0).set_volume(volumen_global)
+        pygame.mixer.Channel(0).play(ASSETS['sonido_mapa1'], -1)
+
+    joystick = get_joystick()
+
+    for evento in pygame.event.get():
+        if evento.type == pygame.QUIT:
+            juego_corriendo = False
+            return
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_ESCAPE:
+                estado_actual = ESTADO_PAUSA
+                pygame.mixer.Channel(0).pause()
+                return
+            if evento.key == pygame.K_SPACE:
+                bala = jugador.disparar(grupo_enemigos)
+                if bala:
+                    grupo_balas_jugador.add(bala)
+        
+        if joystick and evento.type == pygame.JOYBUTTONDOWN:
+            if evento.button == 7:
+                estado_actual = ESTADO_PAUSA
+                pygame.mixer.Channel(0).pause()
+                return
+
+    #actualizacion de camara para que siga el jugador mientras se mueve por el mapa
+    camera_offset_x = jugador.rect.centerx - ANCHO_PANTALLA // 2
+    camera_offset_y = jugador.rect.centery - ALTO_PANTALLA // 2
+
+    #nos aseguramos que la camara no salga de los limites del mapa 
+    camera_offset_x = max(0, min(WORLD_WIDTH - ANCHO_PANTALLA, camera_offset_x))
+    camera_offset_y = max(0, min(WORLD_HEIGHT - ALTO_PANTALLA, camera_offset_y))
+
+    #actualizamos todos los sprites para evitar bugs dentro del juego
+    jugador.update(grupo_obstaculos_actual, grupo_enemigos, camera_offset_x, camera_offset_y)
+    
+    game_state = {
+        'grupo_obstaculos': grupo_obstaculos_actual,
+        'grupo_balas_enemigo': grupo_balas_enemigo,
+        'grid': grid_mapa_actual,
+        'jugador': jugador,
+        'grupo_enemigos': grupo_enemigos
+    }
+    #actualizamos los enemigos para pasarle las coordenadas de la copa que deben defender del jugador
+    for enemigo in grupo_enemigos:
+        enemigo.update(jugador, game_state, posicion_copa_mundo)
+    
+    #actualizamos la torreta
+    for torreta in grupo_torretas:
+        torreta.update(jugador, game_state)
+
+    grupo_balas_jugador.update(camera_offset_x, camera_offset_y)
+    grupo_balas_enemigo.update(camera_offset_x, camera_offset_y)
+    grupo_powerups.update()
+    grupo_explosiones.update()
+    grupo_indicadores_daño.update(camera_offset_y)
+    grupo_indicadores_daño_jugador.update(camera_offset_y)
+
+    #para mejorar el rendimiento del juego vamos eliminando los enemigos que esten alejados del jugador para
+    #asi evitar problemas de rendimiento
+    for enemy in list(grupo_enemigos):
+        if math.sqrt((enemy.rect.centerx - jugador.rect.centerx)**2 + (enemy.rect.centery - jugador.rect.centery)**2) > ANCHO_PANTALLA * 2:
+            enemy.kill()
+    for turret in list(grupo_torretas):
+        if math.sqrt((turret.rect.centerx - jugador.rect.centerx)**2 + (turret.rect.centery - jugador.rect.centery)**2) > ANCHO_PANTALLA * 2:
+            turret.kill()
+
+    #spauneamos mas enemigos segun sean eliminados
+    spawn_enemies_in_view(jugador.rect, len(grupo_enemigos), len(grupo_torretas))
+
+    #coliciones
+    for bala in grupo_balas_jugador:
+        enemigos_golpeados = pygame.sprite.spritecollide(bala, grupo_enemigos, False)
+        for enemigo in enemigos_golpeados:
+            enemigo.recibir_daño(bala.daño)
+            bala.kill()
+            if enemigo.vida <= 0:
+                jugador.score += 100
+                enemigos_eliminados_stats[ENEMY_NAMES_MAP.get(enemigo.tipo_enemigo, "Desconocido")] += 1
+
+                grupo_explosiones.add(Explosion(enemigo.rect.centerx, enemigo.rect.centery))
+                if ASSETS['sonido_explocion']:
+                    pygame.mixer.Channel(2).set_volume(volumen_global)
+                    pygame.mixer.Channel(2).play(ASSETS['sonido_explocion'])
+                
+                if random.random() < 0.2:
+                    powerup_types = ["bonusx2", "estrella", "tnt", "vida"]
+                    chosen_powerup_type = random.choice(powerup_types)
+                    grupo_powerups.add(PowerUp(enemigo.rect.centerx, enemigo.rect.centery, chosen_powerup_type))
+                
+                enemigo.kill()
+                spawn_enemies_in_view(jugador.rect, len(grupo_enemigos), len(grupo_torretas))
+
+        torretas_golpeadas = pygame.sprite.spritecollide(bala, grupo_torretas, False)
+        for torreta in torretas_golpeadas:
+            torreta.recibir_daño(bala.daño)
+            bala.kill()
+            if torreta.vida <= 0:
+                jugador.score += 150
+                enemigos_eliminados_stats[ENEMY_NAMES_MAP.get(torreta.tipo_enemigo, "Desconocido")] += 1
+
+                grupo_explosiones.add(Explosion(torreta.rect.centerx, torreta.rect.centery))
+                if ASSETS['sonido_explocion']:
+                    pygame.mixer.Channel(2).set_volume(volumen_global)
+                    pygame.mixer.Channel(2).play(ASSETS['sonido_explocion'])
+                
+                if random.random() < 0.3:
+                    powerup_types = ["bonusx2", "estrella", "tnt", "vida"]
+                    chosen_powerup_type = random.choice(powerup_types)
+                    grupo_powerups.add(PowerUp(torreta.rect.centerx, torreta.rect.centery, chosen_powerup_type))
+                
+                torreta.kill()
+                spawn_enemies_in_view(jugador.rect, len(grupo_enemigos), len(grupo_torretas))
+
+        obstaculos_golpeados = pygame.sprite.spritecollide(bala, grupo_obstaculos_actual, False)
+        for obstaculo in obstaculos_golpeados:
+            if obstaculo.tipo == "solido":
+                bala.kill()
+            elif obstaculo.tipo == "destructible":
+                obstaculo.recibir_daño(bala.daño)
+                bala.kill()
+    
+    
