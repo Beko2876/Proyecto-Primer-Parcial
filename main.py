@@ -932,7 +932,7 @@ def resetear_juego_para_siguiente_nivel():
 
     pygame.mixer.Channel(0).stop()
 
-# --- Bucle principal del juego ---
+#bucle principal para todos los estados posibles dentro del juego
 while juego_corriendo:
     if estado_actual == ESTADO_INTRO:
         escena_intro()
