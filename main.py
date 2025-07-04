@@ -714,3 +714,243 @@ def escena_pausa():
                         estado_actual = ESTADO_JUEGO
                         pygame.mixer.Channel(0).unpause()
                         return
+        superficie_transparente = pygame.Surface((ANCHO_PANTALLA, ALTO_PANTALLA), pygame.SRCALPHA)
+        superficie_transparente.fill((0, 0, 0, 128))
+        PANTALLA.blit(superficie_transparente, (0, 0))
+
+        fuente_titulo = pygame.font.Font(None, 74)
+        fuente_opciones = pygame.font.Font(None, 50)
+
+        texto_titulo = fuente_titulo.render("PAUSA", True, BLANCO)
+        PANTALLA.blit(texto_titulo, (ANCHO_PANTALLA // 2 - texto_titulo.get_width() // 2, 150))
+
+        for i, opcion in enumerate(opciones):
+            color = ROJO if i == seleccion_actual else BLANCO
+            texto_opcion = fuente_opciones.render(opcion, True, color)
+            PANTALLA.blit(texto_opcion, (ANCHO_PANTALLA // 2 - texto_opcion.get_width() // 2, 250 + i * 60))
+
+        pygame.display.flip()
+        RELOJ.tick(FPS)
+
+def escena_fin_juego():
+    global estado_actual, juego_corriendo, sonido_victoria_reproduciendose
+
+    if ASSETS['sonido_victoria'] and not sonido_victoria_reproduciendose:
+        pygame.mixer.Channel(1).set_volume(volumen_global)
+        pygame.mixer.Channel(1).play(ASSETS['sonido_victoria'])
+        sonido_victoria_reproduciendose = True
+        
+        pygame.time.wait(int(ASSETS['sonido_victoria'].get_length() * 1000))
+        sonido_victoria_reproduciendose = False
+
+    if NIVEL_ACTUAL <= MAX_NIVELES:
+        pass
+    else:
+        estado_actual = ESTADO_ESTADISTICAS_FINALES
+
+def escena_derrota():
+    global estado_actual, juego_corriendo, jugador, sonido_derrota_reproduciendose, joystick_moved_y
+
+    if ASSETS['sonido_menu'] and not pygame.mixer.Channel(0).get_busy():
+        pygame.mixer.Channel(0).set_volume(volumen_global)
+        pygame.mixer.Channel(0).play(ASSETS['sonido_menu'], -1)
+
+    opciones = ["Reintentar", "Volver al Menú", "Salir del Juego"]
+    seleccion_actual = 0
+
+    joystick = get_joystick()
+
+    while estado_actual == ESTADO_DERROTA:
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                juego_corriendo = False
+                return
+            if evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_DOWN:
+                    seleccion_actual = (seleccion_actual + 1) % len(opciones)
+                if evento.key == pygame.K_UP:
+                    seleccion_actual = (seleccion_actual - 1 + len(opciones)) % len(opciones)
+                if evento.key == pygame.K_RETURN:
+                    if seleccion_actual == 0:
+                        resetear_juego()
+                        estado_actual = ESTADO_JUEGO
+                        iniciar_juego()
+                        return
+                    elif seleccion_actual == 1:
+                        resetear_juego()
+                        estado_actual = ESTADO_MENU
+                        return
+                    elif seleccion_actual == 2:
+                        juego_corriendo = False
+                        return
+            
+            if joystick:
+                if evento.type == pygame.JOYAXISMOTION:
+                    if evento.axis == 1:
+                        if evento.value > joystick_threshold_menu and not joystick_moved_y:
+                            seleccion_actual = (seleccion_actual + 1) % len(opciones)
+                            joystick_moved_y = True
+                        elif evento.value < -joystick_threshold_menu and not joystick_moved_y:
+                            seleccion_actual = (seleccion_actual - 1 + len(opciones)) % len(opciones)
+                            joystick_moved_y = True
+                        elif abs(evento.value) < joystick_threshold_menu:
+                            joystick_moved_y = False
+                elif evento.type == pygame.JOYBUTTONDOWN:
+                    if evento.button == 0:
+                        if seleccion_actual == 0:
+                            resetear_juego()
+                            estado_actual = ESTADO_JUEGO
+                            iniciar_juego()
+                            return
+                        elif seleccion_actual == 1:
+                            resetear_juego()
+                            estado_actual = ESTADO_MENU
+                            return
+                        elif seleccion_actual == 2:
+                            juego_corriendo = False
+                            return
+                    elif evento.button == 1:
+                        resetear_juego()
+                        estado_actual = ESTADO_MENU
+                        return
+
+        dibujar_fondo_estrellado()
+
+        fuente_titulo = pygame.font.Font(None, 74)
+        fuente_opciones = pygame.font.Font(None, 50)
+
+        texto_derrota = fuente_titulo.render("HAS SIDO DERROTADO", True, ROJO)
+        PANTALLA.blit(texto_derrota, (ANCHO_PANTALLA // 2 - texto_derrota.get_width() // 2, 150))
+
+        for i, opcion in enumerate(opciones):
+            color = ROJO if i == seleccion_actual else BLANCO
+            texto_opcion = fuente_opciones.render(opcion, True, color)
+            PANTALLA.blit(texto_opcion, (ANCHO_PANTALLA // 2 - texto_opcion.get_width() // 2, 300 + i * 60))
+
+        pygame.display.flip()
+        RELOJ.tick(FPS)
+
+def escena_estadisticas_finales():
+    global estado_actual, juego_corriendo, enemigos_eliminados_stats
+
+    font_title = pygame.font.Font(None, 60)
+    font_text = pygame.font.Font(None, 36)
+    font_small = pygame.font.Font(None, 28)
+
+    total_enemigos_eliminados = sum(enemigos_eliminados_stats.values())
+
+    joystick = get_joystick()
+
+    while estado_actual == ESTADO_ESTADISTICAS_FINALES:
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                juego_corriendo = False
+                return
+            if evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_ESCAPE or evento.key == pygame.K_RETURN:
+                    resetear_juego()
+                    estado_actual = ESTADO_MENU
+                    return
+            
+            if joystick and evento.type == pygame.JOYBUTTONDOWN:
+                if evento.button == 1:
+                    resetear_juego()
+                    estado_actual = ESTADO_MENU
+                    return
+
+        dibujar_fondo_estrellado()
+
+        text_title = font_title.render("¡JUEGO COMPLETADO!", True, VERDE)
+        PANTALLA.blit(text_title, (ANCHO_PANTALLA // 2 - text_title.get_width() // 2, 50))
+
+        text_total = font_text.render(f"Total de enemigos eliminados: {total_enemigos_eliminados}", True, VERDE)
+        PANTALLA.blit(text_total, (ANCHO_PANTALLA // 2 - text_total.get_width() // 2, 120))
+
+        y_offset = 180
+        
+        for i, (enemy_name, count) in enumerate(enemigos_eliminados_stats.items()):
+            enemy_stats_text = font_text.render(f"{enemy_name}: {count}", True, BLANCO)
+            PANTALLA.blit(enemy_stats_text, (ANCHO_PANTALLA // 2 - enemy_stats_text.get_width() // 2, y_offset + i * 40))
+
+        text_return = font_small.render("Presiona ESC o ENTER para volver al menú", True, BLANCO)
+        PANTALLA.blit(text_return, (ANCHO_PANTALLA // 2 - text_return.get_width() // 2, ALTO_PANTALLA - 50))
+
+        pygame.display.flip()
+        RELOJ.tick(FPS)
+
+def resetear_juego():
+    global jugador, grupo_enemigos, grupo_torretas, grupo_balas_jugador, grupo_balas_enemigo, grupo_obstaculos_actual
+    global sonido_derrota_reproduciendose, grupo_explosiones, grupo_powerups, grupo_indicadores_daño, grupo_indicadores_daño_jugador, enemigos_eliminados_stats
+    global joystick_moved_x, joystick_moved_y, camera_offset_x, camera_offset_y, posicion_copa_mundo, copa_sprite, copa_encontrada, NIVEL_ACTUAL
+
+    jugador = None
+    grupo_enemigos.empty()
+    grupo_torretas.empty()
+    grupo_balas_jugador.empty()
+    grupo_balas_enemigo.empty()
+    grupo_obstaculos_actual.empty()
+    grupo_explosiones.empty()
+    grupo_powerups.empty()
+    grupo_indicadores_daño.empty()
+    grupo_indicadores_daño_jugador.empty()
+    
+    camera_offset_x = 0
+    camera_offset_y = 0
+
+    posicion_copa_mundo = None
+    copa_sprite = None
+    copa_encontrada = False
+
+    NIVEL_ACTUAL = 1
+
+    pygame.mixer.Channel(0).stop()
+    sonido_derrota_reproduciendose = False
+    for key in enemigos_eliminados_stats:
+        enemigos_eliminados_stats[key] = 0
+    
+    joystick_moved_x = False
+    joystick_moved_y = False
+
+def resetear_juego_para_siguiente_nivel():
+    global grupo_enemigos, grupo_torretas, grupo_balas_jugador, grupo_balas_enemigo, grupo_obstaculos_actual
+    global grupo_explosiones, grupo_powerups, grupo_indicadores_daño, grupo_indicadores_daño_jugador
+    global posicion_copa_mundo, copa_sprite, copa_encontrada
+
+    grupo_enemigos.empty()
+    grupo_torretas.empty()
+    grupo_balas_jugador.empty()
+    grupo_balas_enemigo.empty()
+    grupo_obstaculos_actual.empty()
+    grupo_explosiones.empty()
+    grupo_powerups.empty()
+    grupo_indicadores_daño.empty()
+    grupo_indicadores_daño_jugador.empty()
+    
+    posicion_copa_mundo = None
+    copa_sprite = None
+    copa_encontrada = False
+
+    pygame.mixer.Channel(0).stop()
+
+# --- Bucle principal del juego ---
+while juego_corriendo:
+    if estado_actual == ESTADO_INTRO:
+        escena_intro()
+    elif estado_actual == ESTADO_MENU:
+        escena_menu()
+    elif estado_actual == ESTADO_SELECCION_PERSONAJE:
+        escena_seleccion_personaje()
+    elif estado_actual == ESTADO_JUEGO:
+        escena_juego()
+    elif estado_actual == ESTADO_PAUSA:
+        escena_pausa()
+    elif estado_actual == ESTADO_FIN_JUEGO:
+        escena_fin_juego()
+    elif estado_actual == ESTADO_DERROTA:
+        escena_derrota()
+    elif estado_actual == ESTADO_CONFIGURACION:
+        escena_configuracion()
+    elif estado_actual == ESTADO_ESTADISTICAS_FINALES:
+        escena_estadisticas_finales()
+
+pygame.quit()
