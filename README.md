@@ -1,7 +1,7 @@
 # Proyecto-parcial-IA
 
-## Nombre
+## Nombre: FElIX ANTONIO MERCEDES MERCEDES
 
-## Matrícula
+## Matrícula: 21-EISN-2-047
 
-## Proyecto
+## Proyecto: THE CHAOS ENGINE (UN CLON SEMI EXACTO)
