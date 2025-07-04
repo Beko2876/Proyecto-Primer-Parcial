@@ -148,3 +148,133 @@ class Jugador(pygame.sprite.Sprite):
                     if x_pos + ancho_frame <= ancho_sheet:
                         frame = sprite_sheet.subsurface((x_pos, 0, ancho_frame, alto_frame))
                         frame = pygame.transform.scale(frame, (SCALED_TILE_SIZE, SCALED_TILE_SIZE))
+                        frames_dict[direccion].append(frame)
+                    else:
+                        frame_default = pygame.Surface((SCALED_TILE_SIZE, SCALED_TILE_SIZE), pygame.SRCALPHA)
+                        frames_dict[direccion].append(frame_default)
+            else:
+                for i in range(4):
+                    frame_default = pygame.Surface((SCALED_TILE_SIZE, SCALED_TILE_SIZE), pygame.SRCALPHA)
+                    frames_dict[direccion].append(frame_default)
+        return frames_dict
+
+    def cargar_frames_por_direccion(self, sprite_sheet, num_columnas, num_filas):
+        """Cargar frames de animación desde un sprite sheet"""
+        frames_dict = {direction: [] for direction in self.directions_order}
+        if sprite_sheet:
+            ancho_sheet = sprite_sheet.get_width()
+            alto_sheet = sprite_sheet.get_height()
+            if num_columnas == 0 or num_filas == 0:
+                return {direction: [pygame.Surface((SCALED_TILE_SIZE, SCALED_TILE_SIZE), pygame.SRCALPHA)] for direction in
+                        self.directions_order}
+            ancho_frame_original = ancho_sheet // num_columnas
+            alto_frame_original = alto_sheet // num_filas
+            
+            for row_index, direction_name in enumerate(self.directions_order):
+                y_pos = row_index * alto_frame_original
+                for col_index in range(num_columnas):
+                    x_pos = col_index * ancho_frame_original
+                    if x_pos + ancho_frame_original <= ancho_sheet and y_pos + alto_frame_original <= alto_sheet:
+                        frame = sprite_sheet.subsurface((x_pos, y_pos, ancho_frame_original, alto_frame_original))
+                        frame = pygame.transform.scale(frame, (SCALED_TILE_SIZE, SCALED_TILE_SIZE))
+                        frames_dict[direction_name].append(frame)
+                    else:
+                        frames_dict[direction_name].append(
+                            pygame.Surface((SCALED_TILE_SIZE, SCALED_TILE_SIZE), pygame.SRCALPHA))
+            return frames_dict
+        default_surface = pygame.Surface((SCALED_TILE_SIZE, SCALED_TILE_SIZE), pygame.SRCALPHA)
+        return {direction: [default_surface] for direction in self.directions_order}
+
+    def update(self, grupo_obstaculos, grupo_enemigos_param, offset_x, offset_y):
+        """Método principal de actualización del jugador"""
+        dx, dy = 0, 0
+        keys = pygame.key.get_pressed()
+        ahora = pygame.time.get_ticks()
+        moving = False
+
+        #aparte del gamepad tambien usaremos el teclado para que una mejor jugabilidad en el juego en caso de que el jugador no desee jugar con un
+        #gamepad
+        if keys[pygame.K_LEFT] and keys[pygame.K_UP]:
+            dx = -self.velocidad
+            dy = -self.velocidad
+            self.direccion_disparo = (-1, -1)
+            self.direction = "up"
+            moving = True
+        elif keys[pygame.K_LEFT] and keys[pygame.K_DOWN]:
+            dx = -self.velocidad
+            dy = self.velocidad
+            self.direccion_disparo = (-1, 1)
+            self.direction = "down"
+            moving = True
+        elif keys[pygame.K_RIGHT] and keys[pygame.K_UP]:
+            dx = self.velocidad
+            dy = -self.velocidad
+            self.direccion_disparo = (1, -1)
+            self.direction = "up"
+            moving = True
+        elif keys[pygame.K_RIGHT] and keys[pygame.K_DOWN]:
+            dx = self.velocidad
+            dy = self.velocidad
+            self.direccion_disparo = (1, 1)
+            self.direction = "down"
+            moving = True
+        elif keys[pygame.K_LEFT]:
+            dx = -self.velocidad
+            self.direccion_disparo = (-1, 0)
+            self.direction = "left"
+            moving = True
+        elif keys[pygame.K_RIGHT]:
+            dx = self.velocidad
+            self.direccion_disparo = (1, 0)
+            self.direction = "right"
+            moving = True
+        elif keys[pygame.K_UP]:
+            dy = -self.velocidad
+            self.direccion_disparo = (0, -1)
+            self.direction = "up"
+            moving = True
+        elif keys[pygame.K_DOWN]:
+            dy = self.velocidad
+            self.direccion_disparo = (0, 1)
+            self.direction = "down"
+            moving = True
+
+        #manejo de gamepad
+        if pygame.joystick.get_count() > 0:
+            if self.joystick is None:
+                self.joystick = pygame.joystick.Joystick(0)
+                self.joystick.init()
+
+            axis_x = self.joystick.get_axis(0)
+            axis_y = self.joystick.get_axis(1)
+            
+            trigger_right = self.joystick.get_axis(5)
+
+            if abs(axis_x) > self.joystick_threshold or abs(axis_y) > self.joystick_threshold:
+                dx = axis_x * self.velocidad
+                dy = axis_y * self.velocidad
+                moving = True
+
+                if abs(axis_x) > abs(axis_y):
+                    self.direction = "right" if axis_x > 0 else "left"
+                else:
+                    self.direction = "down" if axis_y > 0 else "up"
+                
+                mag = math.sqrt(axis_x**2 + axis_y**2)
+                if mag > 0:
+                    self.direccion_disparo = (axis_x / mag, axis_y / mag)
+                else:
+                    self.direccion_disparo = (0, 0)
+
+            if trigger_right > self.joystick_shoot_threshold:
+                bala = self.disparar(grupo_enemigos_param)
+                if bala:
+                    grupo_balas_jugador.add(bala)
+
+        if self.direccion_disparo[0] != 0 or self.direccion_disparo[1] != 0:
+            mag = (self.direccion_disparo[0] ** 2 + self.direccion_disparo[1] ** 2) ** 0.5
+            if mag > 0:
+                self.direccion_disparo = (self.direccion_disparo[0] / mag, self.direccion_disparo[1] / mag)
+
+        self.rect.x += dx
+        self.rect.y += dy
