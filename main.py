@@ -93,4 +93,70 @@ def generar_mapa_interactivo():
                 for j in range(y_grid_start, y_grid_end + 1):
                     if 0 <= i < GRID_ANCHO and 0 <= j < GRID_ALTO:
                         grid_mapa_actual[i][j] = 1
+                        
+                        
+      #generamos la copa en un lugar aleatorio y alejada del jugador
+    attempts = 0
+    player_start_x = WORLD_WIDTH // 2
+    player_start_y = WORLD_HEIGHT // 2
+    min_distance_from_player = max(ANCHO_PANTALLA, ALTO_PANTALLA) * 1.5
     
+    while attempts < 200:
+        cx = random.randint(TILE_SIZE, WORLD_WIDTH - TILE_SIZE)
+        cy = random.randint(TILE_SIZE, WORLD_HEIGHT - TILE_SIZE)
+        
+        dist_to_player_start = math.sqrt((cx - player_start_x)**2 + (cy - player_start_y)**2)
+
+        if dist_to_player_start > min_distance_from_player:
+            copa_temp_rect = pygame.Rect(cx, cy, TILE_SIZE * 2, TILE_SIZE * 2)
+            collision_with_obstacle = False
+            for obstaculo in grupo_obstaculos_actual:
+                if obstaculo.tipo in ["solido", "destructible"] and copa_temp_rect.colliderect(obstaculo.rect):
+                    collision_with_obstacle = True
+                    break
+            
+            if not collision_with_obstacle:
+                posicion_copa_mundo = (cx, cy)
+                copa_sprite = PowerUp(cx, cy, "copa")
+                break
+        attempts += 1
+    
+    if posicion_copa_mundo is None:
+        posicion_copa_mundo = (WORLD_WIDTH - TILE_SIZE * 5, WORLD_HEIGHT - TILE_SIZE * 5)
+        copa_sprite = PowerUp(posicion_copa_mundo[0], posicion_copa_mundo[1], "copa")
+
+def spawn_enemies_in_view(player_rect, current_enemies_count, current_turrets_count):
+    global grupo_enemigos, grupo_torretas
+    
+    spawn_margin = TILE_SIZE * 5
+    
+  
+    min_x_world = max(0, player_rect.centerx - ANCHO_PANTALLA // 2 - spawn_margin)
+    max_x_world = min(WORLD_WIDTH - TILE_SIZE, player_rect.centerx + ANCHO_PANTALLA // 2 + spawn_margin)
+    min_y_world = max(0, player_rect.centery - ALTO_PANTALLA // 2 - spawn_margin)
+    max_y_world = min(WORLD_HEIGHT - TILE_SIZE, player_rect.centery + ALTO_PANTALLA // 2 + spawn_margin)
+
+   
+    target_enemies = num_enemigos_por_zona
+    enemies_to_spawn = target_enemies - current_enemies_count
+
+    for _ in range(enemies_to_spawn):
+        attempts = 0
+        spawn_x, spawn_y = -1, -1
+        while attempts < 50:
+            
+            side = random.choice(['top', 'bottom', 'left', 'right'])
+            
+            if side == 'top':
+                x_pos = random.randint(max(0, player_rect.centerx - ANCHO_PANTALLA // 2), min(WORLD_WIDTH - TILE_SIZE, player_rect.centerx + ANCHO_PANTALLA // 2))
+                y_pos = random.randint(max(0, player_rect.centery - ALTO_PANTALLA // 2 - spawn_margin), max(0, player_rect.centery - ALTO_PANTALLA // 2 - TILE_SIZE))
+            elif side == 'bottom':
+                x_pos = random.randint(max(0, player_rect.centerx - ANCHO_PANTALLA // 2), min(WORLD_WIDTH - TILE_SIZE, player_rect.centerx + ANCHO_PANTALLA // 2))
+                y_pos = random.randint(min(WORLD_HEIGHT - TILE_SIZE, player_rect.centery + ALTO_PANTALLA // 2 + TILE_SIZE), min(WORLD_HEIGHT - TILE_SIZE, player_rect.centery + ALTO_PANTALLA // 2 + spawn_margin))
+            elif side == 'left':
+                x_pos = random.randint(max(0, player_rect.centerx - ANCHO_PANTALLA // 2 - spawn_margin), max(0, player_rect.centerx - ANCHO_PANTALLA // 2 - TILE_SIZE))
+                y_pos = random.randint(max(0, player_rect.centery - ALTO_PANTALLA // 2), min(WORLD_HEIGHT - TILE_SIZE, player_rect.centery + ALTO_PANTALLA // 2))
+            else: 
+                x_pos = random.randint(min(WORLD_WIDTH - TILE_SIZE, player_rect.centerx + ANCHO_PANTALLA // 2 + TILE_SIZE), min(WORLD_WIDTH - TILE_SIZE, player_rect.centerx + ANCHO_PANTALLA // 2 + spawn_margin))
+                y_pos = random.randint(max(0, player_rect.centery - ALTO_PANTALLA // 2), min(WORLD_HEIGHT - TILE_SIZE, player_rect.centery + ALTO_PANTALLA // 2))
+
