@@ -41,7 +41,6 @@ CARPETA_RAIZ_JUEGO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CARPETA_ACTIVOS = os.path.join(CARPETA_RAIZ_JUEGO, "assets")
 
 CARPETA_SONIDOS = os.path.join(CARPETA_ACTIVOS, "sonidos")
-CARPETA_MENU = os.path.join(CARPETA_ACTIVOS, "menu")
 CARPETA_ENEMIGOS = os.path.join(CARPETA_ACTIVOS, "enemigos")
 CARPETA_MOVIMIENTOS = os.path.join(CARPETA_ACTIVOS, "movimientos")
 CARPETA_MERCENARIOS = os.path.join(CARPETA_ACTIVOS, "mercenarios")
