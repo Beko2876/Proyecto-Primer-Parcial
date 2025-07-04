@@ -484,4 +484,233 @@ def escena_juego():
                 obstaculo.recibir_daño(bala.daño)
                 bala.kill()
     
+    #coliciones de balas enemigas contra el jugador
+    for bala_enemigo in grupo_balas_enemigo:
+        if pygame.sprite.collide_rect(bala_enemigo, jugador):
+            jugador.recibir_daño(bala_enemigo.daño)
+            bala_enemigo.kill()
+
+    for enemigo in grupo_enemigos:
+        if enemigo.rect.colliderect(jugador.rect):
+            ahora = pygame.time.get_ticks()
+            if ahora - enemigo.ultimo_ataque_cuerpo_a_cuerpo > enemigo.tiempo_entre_ataques_cuerpo_a_cuerpo:
+                enemigo.ultimo_ataque_cuerpo_a_cuerpo = ahora
+                jugador.recibir_daño(ENEMY_MELEE_DAMAGE)
+
+    powerups_recolectados = pygame.sprite.spritecollide(jugador, grupo_powerups, True)
+    for powerup in powerups_recolectados:
+        if ASSETS['sonido_powerup']:
+            pygame.mixer.Channel(3).set_volume(volumen_global)
+            pygame.mixer.Channel(3).play(ASSETS['sonido_powerup'])
+
+        if powerup.tipo == "bonusx2":
+            jugador.activar_bonus_x2()
+        elif powerup.tipo == "estrella":
+            jugador.activar_invulnerabilidad()
+        elif powerup.tipo == "tnt":
+            for enemy in list(grupo_enemigos):
+                grupo_explosiones.add(Explosion(enemy.rect.centerx, enemy.rect.centery))
+                if ASSETS['sonido_explocion']:
+                    pygame.mixer.Channel(2).set_volume(volumen_global)
+                    pygame.mixer.Channel(2).play(ASSETS['sonido_explocion'])
+                
+                enemigos_eliminados_stats[ENEMY_NAMES_MAP.get(enemy.tipo_enemigo, "Desconocido")] += 1
+
+                enemy.kill()
+                jugador.score += 100
+                spawn_enemies_in_view(jugador.rect, len(grupo_enemigos), len(grupo_torretas))
+            for turret in list(grupo_torretas):
+                grupo_explosiones.add(Explosion(turret.rect.centerx, turret.rect.centery))
+                if ASSETS['sonido_explocion']:
+                    pygame.mixer.Channel(2).set_volume(volumen_global)
+                    pygame.mixer.Channel(2).play(ASSETS['sonido_explocion'])
+                
+                enemigos_eliminados_stats[ENEMY_NAMES_MAP.get(turret.tipo_enemigo, "Desconocido")] += 1
+
+                turret.kill()
+                jugador.score += 150
+                spawn_enemies_in_view(jugador.rect, len(grupo_enemigos), len(grupo_torretas))
+
+        elif powerup.tipo == "vida":
+            jugador.aumentar_corazon()
     
+    #colicion entre la copa y el jugador
+    if copa_sprite and jugador.rect.colliderect(copa_sprite.rect):
+        copa_encontrada = True
+        if ASSETS['sonido_victoria']:
+            pygame.mixer.Channel(1).set_volume(volumen_global)
+            pygame.mixer.Channel(1).play(ASSETS['sonido_victoria'])
+        pygame.mixer.Channel(0).stop()
+        
+        if NIVEL_ACTUAL < MAX_NIVELES:
+            NIVEL_ACTUAL += 1
+            resetear_juego_para_siguiente_nivel()
+            iniciar_juego()
+        else:
+            estado_actual = ESTADO_ESTADISTICAS_FINALES
+
+    if jugador.corazones <= 0:
+        pygame.mixer.Channel(0).stop()
+        
+        global sonido_derrota_reproduciendose
+        if ASSETS['sonido_perdiste'] and not sonido_derrota_reproduciendose:
+            pygame.mixer.Channel(1).set_volume(volumen_global)
+            pygame.mixer.Channel(1).play(ASSETS['sonido_perdiste'])
+            sonido_derrota_reproduciendose = True
+            
+            pygame.time.wait(int(ASSETS['sonido_perdiste'].get_length() * 1000))
+            sonido_derrota_reproduciendose = False
+
+        estado_actual = ESTADO_DERROTA
+
+    PANTALLA.fill(VERDE_PASTO)
+
+
+    visible_rect = pygame.Rect(camera_offset_x, camera_offset_y, ANCHO_PANTALLA, ALTO_PANTALLA)
+
+    for sprite in grupo_obstaculos_actual:
+        if visible_rect.colliderect(sprite.rect):
+            PANTALLA.blit(sprite.image, (sprite.rect.x - camera_offset_x, sprite.rect.y - camera_offset_y))
+    
+    for sprite in grupo_enemigos:
+        if visible_rect.colliderect(sprite.rect):
+            PANTALLA.blit(sprite.image, (sprite.rect.x - camera_offset_x, sprite.rect.y - camera_offset_y))
+            sprite.draw_health_bar(PANTALLA, camera_offset_x, camera_offset_y)
+
+    for sprite in grupo_torretas:
+        if visible_rect.colliderect(sprite.rect):
+            PANTALLA.blit(sprite.image, (sprite.rect.x - camera_offset_x, sprite.rect.y - camera_offset_y))
+            sprite.draw_health_bar(PANTALLA, camera_offset_x, camera_offset_y)
+
+    for sprite in grupo_balas_jugador:
+        if visible_rect.colliderect(sprite.rect):
+            PANTALLA.blit(sprite.image, (sprite.rect.x - camera_offset_x, sprite.rect.y - camera_offset_y))
+    
+    for sprite in grupo_balas_enemigo:
+        if visible_rect.colliderect(sprite.rect):
+            PANTALLA.blit(sprite.image, (sprite.rect.x - camera_offset_x, sprite.rect.y - camera_offset_y))
+
+    for sprite in grupo_powerups:
+        if visible_rect.colliderect(sprite.rect):
+            PANTALLA.blit(sprite.image, (sprite.rect.x - camera_offset_x, sprite.rect.y - camera_offset_y))
+
+    for sprite in grupo_explosiones:
+        if visible_rect.colliderect(sprite.rect):
+            PANTALLA.blit(sprite.image, (sprite.rect.x - camera_offset_x, sprite.rect.y - camera_offset_y))
+
+    for sprite in grupo_indicadores_daño:
+        PANTALLA.blit(sprite.image, (sprite.rect.x - camera_offset_x, sprite.rect.y))
+    
+    for sprite in grupo_indicadores_daño_jugador:
+        PANTALLA.blit(sprite.image, (sprite.rect.x - camera_offset_x, sprite.rect.y))
+
+    #dibujamos la copa
+    if copa_sprite and visible_rect.colliderect(copa_sprite.rect):
+        PANTALLA.blit(copa_sprite.image, (copa_sprite.rect.x - camera_offset_x, copa_sprite.rect.y - camera_offset_y))
+
+    #dibujamos el jugador en el centro del mapa relativo a la camara
+    PANTALLA.blit(jugador.image, (jugador.rect.x - camera_offset_x, jugador.rect.y - camera_offset_y))
+
+    jugador.draw_aim_assist(PANTALLA)
+
+    # dibujamos el UI
+    corazon_img = pygame.transform.scale(ASSETS['powerup_vida'], (30, 30))
+    for i in range(jugador.corazones):
+        PANTALLA.blit(corazon_img, (10 + i * 35, 10))
+    
+    if jugador.corazones > 0:
+        barra_ancho = 30
+        barra_alto = 5
+        vida_porcentaje = jugador.vida_actual_corazon / jugador.vida_por_corazon
+        pygame.draw.rect(PANTALLA, ROJO, (10, 45, barra_ancho, barra_alto))
+        pygame.draw.rect(PANTALLA, VERDE, (10, 45, barra_ancho * vida_porcentaje, barra_alto))
+
+    fuente_ui = pygame.font.Font(None, 30)
+    texto_enemigos_restantes = fuente_ui.render(f"Enemigos en pantalla: {len(grupo_enemigos) + len(grupo_torretas)}", True, BLANCO)
+    PANTALLA.blit(texto_enemigos_restantes, (ANCHO_PANTALLA - texto_enemigos_restantes.get_width() - 10, 10))
+    texto_score = fuente_ui.render(f"Score: {jugador.score}", True, BLANCO)
+    PANTALLA.blit(texto_score, (ANCHO_PANTALLA - texto_score.get_width() - 10, 40))
+    texto_nivel = fuente_ui.render(f"Nivel: {NIVEL_ACTUAL}/{MAX_NIVELES}", True, BLANCO)
+    PANTALLA.blit(texto_nivel, (ANCHO_PANTALLA - texto_nivel.get_width() - 10, 70))
+
+    if jugador.invulnerable_powerup_activo:
+        fuente_powerup = pygame.font.Font(None, 24)
+        tiempo_restante = max(0, (jugador.duracion_invulnerabilidad_powerup - (pygame.time.get_ticks() - jugador.tiempo_inicio_invulnerabilidad_powerup)) // 1000)
+        texto_invulnerable = fuente_powerup.render(f"Inmune: {tiempo_restante}s", True, AZUL)
+        PANTALLA.blit(texto_invulnerable, (10, ALTO_PANTALLA - 30))
+    
+    if jugador.bonus_x2_activo:
+        fuente_powerup = pygame.font.Font(None, 24)
+        tiempo_restante = max(0, (jugador.duracion_bonus_x2 - (pygame.time.get_ticks() - jugador.tiempo_inicio_bonus_x2)) // 1000)
+        texto_bonusx2 = fuente_powerup.render(f"Bonus x2: {tiempo_restante}s", True, AMARILLO)
+        PANTALLA.blit(texto_bonusx2, (10, ALTO_PANTALLA - 60))
+
+    # Dibujar el minimapa
+    dibujar_minimapa(PANTALLA, jugador.rect, camera_offset_x, camera_offset_y)
+
+    pygame.display.flip()
+    RELOJ.tick(FPS)
+
+def escena_pausa():
+    global estado_actual, juego_corriendo, joystick_moved_y
+
+    opciones = ["Continuar", "Volver al Menú", "Salir del Juego"]
+    seleccion_actual = 0
+
+    joystick = get_joystick()
+
+    while estado_actual == ESTADO_PAUSA:
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                juego_corriendo = False
+                return
+            if evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_ESCAPE:
+                    estado_actual = ESTADO_JUEGO
+                    pygame.mixer.Channel(0).unpause()
+                    return
+                if evento.key == pygame.K_DOWN:
+                    seleccion_actual = (seleccion_actual + 1) % len(opciones)
+                if evento.key == pygame.K_UP:
+                    seleccion_actual = (seleccion_actual - 1 + len(opciones)) % len(opciones)
+                if evento.key == pygame.K_RETURN:
+                    if seleccion_actual == 0:
+                        estado_actual = ESTADO_JUEGO
+                        pygame.mixer.Channel(0).unpause()
+                        return
+                    elif seleccion_actual == 1:
+                        resetear_juego()
+                        estado_actual = ESTADO_MENU
+                        return
+                    elif seleccion_actual == 2:
+                        juego_corriendo = False
+                        return
+            
+            if joystick:
+                if evento.type == pygame.JOYAXISMOTION:
+                    if evento.axis == 1:
+                        if evento.value > joystick_threshold_menu and not joystick_moved_y:
+                            seleccion_actual = (seleccion_actual + 1) % len(opciones)
+                            joystick_moved_y = True
+                        elif evento.value < -joystick_threshold_menu and not joystick_moved_y:
+                            seleccion_actual = (seleccion_actual - 1 + len(opciones)) % len(opciones)
+                            joystick_moved_y = True
+                        elif abs(evento.value) < joystick_threshold_menu:
+                            joystick_moved_y = False
+                elif evento.type == pygame.JOYBUTTONDOWN:
+                    if evento.button == 0 or evento.button == 7:
+                        if seleccion_actual == 0:
+                            estado_actual = ESTADO_JUEGO
+                            pygame.mixer.Channel(0).unpause()
+                            return
+                        elif seleccion_actual == 1:
+                            resetear_juego()
+                            estado_actual = ESTADO_MENU
+                            return
+                        elif seleccion_actual == 2:
+                            juego_corriendo = False
+                            return
+                    elif evento.button == 1:
+                        estado_actual = ESTADO_JUEGO
+                        pygame.mixer.Channel(0).unpause()
+                        return
