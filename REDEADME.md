@@ -47,5 +47,5 @@ The Chaos Engine/
 
 1. Clona el repositorio:
 ```bash
-git clone https://github.com/tu-usuario/the-chaos-engine-clone.git
+https://github.com/Beko2876/Proyecto-Primer-Parcial.git
 cd the-chaos-engine-clone
